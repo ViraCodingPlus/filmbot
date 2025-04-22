@@ -23,7 +23,8 @@ def start(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(f'سلام {user.mention_html()}!\n'
                               f'به ربات جستجوی فیلم و سریال خوش آمدید.\n'
                               f'برای جستجو، نام فیلم یا سریال را بنویسید.\n'
-                              f'برای دیدن لیست ژانرها، دستور /genres را وارد کنید.',
+                              f'برای دیدن لیست ژانرها، دستور /genres را وارد کنید.\n'
+                              f'برای توقف جستجو، از دستور /stop استفاده کنید.',
                               parse_mode='HTML')
 
 def help_command(update: Update, context: CallbackContext) -> None:
@@ -34,7 +35,8 @@ def help_command(update: Update, context: CallbackContext) -> None:
                              '/help - نمایش راهنما\n'
                              '/genres - نمایش لیست ژانرها\n'
                              '/countries - نمایش لیست کشورها\n'
-                             '/search [نام] --type [movie|series] --genre [id] - جستجوی پیشرفته')
+                             '/search [نام] --type [movie|series] --genre [id] - جستجوی پیشرفته\n'
+                             '/stop - توقف جستجوی فعلی و پاک‌سازی فیلترها')
 
 def list_genres(update: Update, context: CallbackContext) -> None:
     """List all available genres with buttons."""
@@ -58,6 +60,9 @@ def list_genres(update: Update, context: CallbackContext) -> None:
     # Add the last row if not empty
     if row:
         keyboard.append(row)
+    
+    # Add cancel button
+    keyboard.append([InlineKeyboardButton("❌ لغو", callback_data="cancel_search")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text('لطفاً یک ژانر انتخاب کنید:', reply_markup=reply_markup)
@@ -84,6 +89,9 @@ def list_countries(update: Update, context: CallbackContext) -> None:
     # Add the last row if not empty
     if row:
         keyboard.append(row)
+    
+    # Add cancel button
+    keyboard.append([InlineKeyboardButton("❌ لغو", callback_data="cancel_search")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text('لطفاً یک کشور انتخاب کنید:', reply_markup=reply_markup)
@@ -164,6 +172,19 @@ def button_callback(update: Update, context: CallbackContext) -> None:
             else:
                 # If no pending search, prompt for input
                 query.message.reply_text("🔍 لطفاً نام فیلم یا سریال مورد نظر خود را وارد کنید.")
+        
+        elif callback_data == "cancel_search":
+            # Clear all user data
+            context.user_data.clear()
+            
+            logger.info(f"User cancelled search via button")
+            
+            # Edit the original message to confirm cancellation
+            query.edit_message_text(text="🛑 جستجو لغو شد.")
+            
+            # Send a new message confirming cancellation
+            query.message.reply_text("جستجو لغو شد. می‌توانید جستجوی جدیدی را شروع کنید.")
+        
         else:
             logger.warning(f"Unknown callback data received: {callback_data}")
             query.message.reply_text("خطا: دستور ناشناخته. لطفاً دوباره تلاش کنید.")
@@ -181,7 +202,14 @@ def advanced_search(update: Update, context: CallbackContext) -> None:
     
     if not args:
         update.message.reply_text('لطفاً عبارت جستجو را وارد کنید.\n'
-                                 'مثال: /search عنوان فیلم --type movie --genre 28')
+                                 'مثال: /search عنوان فیلم --type movie --genre 28\n'
+                                 'برای لغو جستجو از دستور /stop استفاده کنید.')
+        return
+    
+    # Check if this is a cancel request
+    if args[0].lower() in ['cancel', 'stop', 'لغو', 'توقف']:
+        context.user_data.clear()
+        update.message.reply_text("🛑 جستجو لغو شد.")
         return
     
     query = []
@@ -248,6 +276,9 @@ def search(update: Update, context: CallbackContext) -> None:
                     InlineKeyboardButton("فیلم", callback_data="type_movie"),
                     InlineKeyboardButton("سریال", callback_data="type_series"),
                     InlineKeyboardButton("هر دو", callback_data="type_both")
+                ],
+                [
+                    InlineKeyboardButton("❌ لغو جستجو", callback_data="cancel_search")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -356,6 +387,16 @@ def perform_search(update: Update, context: CallbackContext, query, content_type
         import traceback
         logger.error(traceback.format_exc())
 
+def stop_command(update: Update, context: CallbackContext) -> None:
+    """Stop the current search and clear all filters."""
+    # Clear all user data
+    context.user_data.clear()
+    
+    # Send confirmation message
+    update.message.reply_text("🛑 جستجو متوقف شد و تمام فیلترها پاک شدند.\n"
+                             "می‌توانید جستجوی جدیدی را شروع کنید.")
+    logger.info(f"User {update.effective_user.id} stopped search and cleared filters")
+
 def main() -> None:
     """Start the bot."""
     # Get the token from environment variable
@@ -377,6 +418,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("genres", list_genres))
     dispatcher.add_handler(CommandHandler("countries", list_countries))
     dispatcher.add_handler(CommandHandler("search", advanced_search))
+    dispatcher.add_handler(CommandHandler("stop", stop_command))
     
     # Register callback query handler for button presses
     dispatcher.add_handler(CallbackQueryHandler(button_callback))
