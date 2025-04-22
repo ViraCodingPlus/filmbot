@@ -213,36 +213,18 @@ def perform_search(update: Update, context: CallbackContext, query, content_type
         message.reply_text("متأسفانه نتیجه‌ای یافت نشد.")
         return
     
-    # Limit results to avoid overwhelming Telegram
-    MAX_RESULTS = 5
-    if len(results) > MAX_RESULTS:
-        message.reply_text(f"تعداد {len(results)} نتیجه یافت شد. نمایش {MAX_RESULTS} نتیجه اول:")
-        results = results[:MAX_RESULTS]
-    else:
-        message.reply_text(f"تعداد {len(results)} نتیجه یافت شد:")
-    
     # Send results
     for result in results:
         title = result.get('title', 'بدون عنوان')
         year = result.get('year', '')
         genre = result.get('genre', '')
-        description = result.get('description', '')
         content_type = result.get('type', '')
-        poster = result.get('poster', '')
+        poster = result.get('cover', '')
         
         caption = f"🎬 *{title}*\n"
         caption += f"📅 سال: {year}\n"
         caption += f"🎭 ژانر: {genre}\n"
         caption += f"📺 نوع: {content_type}\n\n"
-        
-        # Add description if available
-        if description:
-            # If description is too long, truncate it
-            if len(description) > 800:
-                short_desc = description[:800] + "..."
-                caption += f"📝 توضیحات: {short_desc}\n\n"
-            else:
-                caption += f"📝 توضیحات: {description}\n\n"
         
         sources = result.get('sources', [])
         if sources:
@@ -265,77 +247,9 @@ def perform_search(update: Update, context: CallbackContext, query, content_type
                 message.reply_photo(photo=poster, caption=caption, parse_mode='Markdown')
             except Exception as e:
                 logger.error(f"Error sending photo: {e}")
-                # If the error is about the message being too long, truncate it
-                if "message is too long" in str(e).lower():
-                    # Create a shorter caption without description
-                    short_caption = f"🎬 *{title}*\n"
-                    short_caption += f"📅 سال: {year}\n"
-                    short_caption += f"🎭 ژانر: {genre}\n"
-                    short_caption += f"📺 نوع: {content_type}\n\n"
-                    
-                    # Add sources with shorter links
-                    if sources:
-                        short_caption += "🔗 منابع:\n"
-                        for i, source in enumerate(sources[:3]):  # Only 3 sources
-                            parsed_source = video_search.parse_source(source)
-                            if parsed_source:
-                                source_type = parsed_source.get('type', 'نامشخص')
-                                quality = parsed_source.get('quality', 'نامشخص')
-                                url = parsed_source.get('url', '')
-                                short_caption += f"{i+1}. {quality} - {source_type}\n"
-                        
-                    try:
-                        # Try sending the photo with the shorter caption
-                        message.reply_photo(photo=poster, caption=short_caption, parse_mode='Markdown')
-                        
-                        # Send the description separately if it's available
-                        if description:
-                            desc_message = f"*توضیحات {title}:*\n\n{description}"
-                            if len(desc_message) > 4000:  # Telegram message limit
-                                desc_message = desc_message[:3997] + "..."
-                            message.reply_text(desc_message, parse_mode='Markdown')
-                    except Exception as e2:
-                        logger.error(f"Error sending shortened message: {e2}")
-                        message.reply_text(f"*{title}* - اطلاعات بیشتر را نمی‌توان نمایش داد.", parse_mode='Markdown')
-                else:
-                    message.reply_text(caption, parse_mode='Markdown', disable_web_page_preview=False)
-        else:
-            try:
                 message.reply_text(caption, parse_mode='Markdown', disable_web_page_preview=False)
-            except Exception as e:
-                logger.error(f"Error sending text message: {e}")
-                
-                # If the error is about the message being too long, split it
-                if "message is too long" in str(e).lower():
-                    # Send basic info first
-                    basic_info = f"🎬 *{title}*\n"
-                    basic_info += f"📅 سال: {year}\n"
-                    basic_info += f"🎭 ژانر: {genre}\n"
-                    basic_info += f"📺 نوع: {content_type}\n"
-                    
-                    message.reply_text(basic_info, parse_mode='Markdown')
-                    
-                    # Send description separately if available
-                    if description:
-                        desc_message = f"*توضیحات {title}:*\n\n{description}"
-                        if len(desc_message) > 4000:  # Telegram message limit
-                            desc_message = desc_message[:3997] + "..."
-                        message.reply_text(desc_message, parse_mode='Markdown')
-                        
-                    # Send sources separately if available
-                    if sources:
-                        sources_message = f"*منابع {title}:*\n\n"
-                        for i, source in enumerate(sources[:5]):
-                            parsed_source = video_search.parse_source(source)
-                            if parsed_source:
-                                source_type = parsed_source.get('type', 'نامشخص')
-                                quality = parsed_source.get('quality', 'نامشخص')
-                                url = parsed_source.get('url', '')
-                                sources_message += f"{i+1}. [{quality} - {source_type}]({url})\n"
-                        
-                        message.reply_text(sources_message, parse_mode='Markdown')
-                else:
-                    message.reply_text(f"*{title}* - خطا در نمایش اطلاعات کامل.", parse_mode='Markdown')
+        else:
+            message.reply_text(caption, parse_mode='Markdown', disable_web_page_preview=False)
 
 def main() -> None:
     """Start the bot."""
