@@ -358,61 +358,36 @@ def perform_search(update: Update, context: CallbackContext, query, content_type
 
 def main() -> None:
     """Start the bot."""
-    try:
-        # Get the token from environment variable
-        token = os.getenv("TELEGRAM_BOT_TOKEN")
-        
-        if not token or token == "YOUR_TOKEN":
-            print("Please set your TELEGRAM_BOT_TOKEN in the .env file")
-            return
-        
-        # Create the Updater and pass it your bot's token with clean polling settings
-        updater = Updater(
-            token,
-            use_context=True,
-            request_kwargs={'read_timeout': 10, 'connect_timeout': 10}
-        )
-        
-        # Get the dispatcher to register handlers
-        dispatcher = updater.dispatcher
-        
-        # Register command handlers
-        dispatcher.add_handler(CommandHandler("start", start))
-        dispatcher.add_handler(CommandHandler("help", help_command))
-        dispatcher.add_handler(CommandHandler("genres", list_genres))
-        dispatcher.add_handler(CommandHandler("countries", list_countries))
-        dispatcher.add_handler(CommandHandler("search", advanced_search))
-        
-        # Register callback query handler for button presses
-        dispatcher.add_handler(CallbackQueryHandler(button_callback))
-        
-        # Register message handler for search queries
-        dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, search))
-        
-        # Set up error handler
-        def error_handler(update, context):
-            """Log Errors caused by Updates."""
-            logger.warning('Update "%s" caused error "%s"', update, context.error)
-        
-        dispatcher.add_error_handler(error_handler)
-        
-        # Start the Bot with clean startup
-        print(f"Starting Telegram bot...")
-        logger.info("Starting bot with clean polling...")
-        updater.start_polling(
-            clean=True,  # Clean any pending updates on startup
-            timeout=30,
-            drop_pending_updates=True
-        )
-        
-        # Run the bot until you press Ctrl-C
-        updater.idle()
-        
-    except Exception as e:
-        logger.error(f"Error in main function: {str(e)}")
-        print(f"Error starting bot: {str(e)}")
-        import traceback
-        traceback.print_exc()
+    # Get the token from environment variable
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    
+    if not token or token == "YOUR_TOKEN":
+        print("Please set your TELEGRAM_BOT_TOKEN in the .env file")
+        return
+    
+    # Create the Updater and pass it your bot's token
+    updater = Updater(token)
+    
+    # Get the dispatcher to register handlers
+    dispatcher = updater.dispatcher
+    
+    # Register command handlers
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("help", help_command))
+    dispatcher.add_handler(CommandHandler("genres", list_genres))
+    dispatcher.add_handler(CommandHandler("countries", list_countries))
+    dispatcher.add_handler(CommandHandler("search", advanced_search))
+    
+    # Register callback query handler for button presses
+    dispatcher.add_handler(CallbackQueryHandler(button_callback))
+    
+    # Register message handler for search queries
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, search))
+    
+    # Start the Bot
+    print(f"Starting Telegram bot...")
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
     main() 
