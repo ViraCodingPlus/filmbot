@@ -260,8 +260,12 @@ def main() -> None:
         print("Please set your TELEGRAM_BOT_TOKEN in the .env file")
         return
     
-    # Create the Updater and pass it your bot's token
-    updater = Updater(token)
+    # Create the Updater and pass it your bot's token with clean polling settings
+    updater = Updater(
+        token,
+        use_context=True,
+        request_kwargs={'read_timeout': 10, 'connect_timeout': 10}
+    )
     
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
@@ -279,9 +283,31 @@ def main() -> None:
     # Register message handler for search queries
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, search))
     
-    # Start the Bot
+    # Set up error handler
+    def error_handler(update, context):
+        """Log Errors caused by Updates."""
+        logger.warning('Update "%s" caused error "%s"', update, context.error)
+    
+    dispatcher.add_error_handler(error_handler)
+    
+    # Create a unique session file to avoid conflicts
+    try:
+        # Clean up old session files if they exist
+        session_file = "bot_session.json"
+        if os.path.exists(session_file):
+            os.remove(session_file)
+    except Exception as e:
+        logger.warning(f"Error cleaning up session file: {e}")
+    
+    # Start the Bot with clean startup
     print(f"Starting Telegram bot...")
-    updater.start_polling()
+    updater.start_polling(
+        clean=True,  # Clean any pending updates on startup
+        timeout=30,
+        drop_pending_updates=True
+    )
+    
+    # Run the bot until you press Ctrl-C
     updater.idle()
 
 if __name__ == '__main__':
