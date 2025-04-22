@@ -1,10 +1,14 @@
 import os
 import logging
 import tempfile
+from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 import video_search
 from datetime import datetime
+
+# Load environment variables
+load_dotenv()
 
 # Enable logging
 logging.basicConfig(
@@ -249,9 +253,15 @@ def perform_search(update: Update, context: CallbackContext, query, content_type
 
 def main() -> None:
     """Start the bot."""
+    # Get the token from environment variable
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    
+    if not token or token == "YOUR_TOKEN":
+        print("Please set your TELEGRAM_BOT_TOKEN in the .env file")
+        return
+    
     # Create the Updater and pass it your bot's token
-    # Replace 'YOUR_TOKEN' with your actual token from BotFather
-    updater = Updater("YOUR_TOKEN")
+    updater = Updater(token)
     
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
@@ -270,6 +280,7 @@ def main() -> None:
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, search))
     
     # Start the Bot
+    print(f"Starting Telegram bot...")
     updater.start_polling()
     updater.idle()
 
