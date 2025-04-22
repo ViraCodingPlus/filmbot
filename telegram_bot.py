@@ -98,17 +98,53 @@ def button_callback(update: Update, context: CallbackContext) -> None:
     if callback_data.startswith("genre_"):
         genre_id = callback_data.split("_")[1]
         context.user_data['genre_id'] = int(genre_id)
-        query.edit_message_text(text=f"ژانر انتخاب شد. اکنون نام فیلم یا سریال را وارد کنید.")
+        
+        # Get genre name for better feedback
+        genres, _ = video_search.load_json_data()
+        genre_name = "انتخاب شده"
+        for genre in genres:
+            if str(genre.get('id')) == genre_id:
+                genre_name = genre.get('title')
+                break
+        
+        # Edit the original message to confirm selection
+        query.edit_message_text(text=f"ژانر «{genre_name}» انتخاب شد.")
+        
+        # Send a new message prompting for search term
+        query.message.reply_text("🔍 لطفاً اکنون نام فیلم یا سریال مورد نظر خود را وارد کنید.")
     
     elif callback_data.startswith("country_"):
         country_id = callback_data.split("_")[1]
         context.user_data['country_id'] = int(country_id)
-        query.edit_message_text(text=f"کشور انتخاب شد. اکنون نام فیلم یا سریال را وارد کنید.")
+        
+        # Get country name for better feedback
+        _, countries = video_search.load_json_data()
+        country_name = "انتخاب شده"
+        for country in countries:
+            if str(country.get('id')) == country_id:
+                country_name = country.get('title')
+                break
+                
+        # Edit the original message to confirm selection
+        query.edit_message_text(text=f"کشور «{country_name}» انتخاب شد.")
+        
+        # Send a new message prompting for search term
+        query.message.reply_text("🔍 لطفاً اکنون نام فیلم یا سریال مورد نظر خود را وارد کنید.")
     
     elif callback_data.startswith("type_"):
         content_type = callback_data.split("_")[1]
         context.user_data['content_type'] = content_type
-        query.edit_message_text(text=f"نوع محتوا انتخاب شد.")
+        
+        # Map type to Persian for better feedback
+        type_names = {
+            "movie": "فیلم",
+            "series": "سریال",
+            "both": "فیلم و سریال"
+        }
+        type_name = type_names.get(content_type, "نامشخص")
+        
+        # Edit the original message
+        query.edit_message_text(text=f"جستجو در: «{type_name}»")
         
         # Check if there's a pending search
         if 'pending_search' in context.user_data:
@@ -116,6 +152,9 @@ def button_callback(update: Update, context: CallbackContext) -> None:
             perform_search(update, context, search_query, content_type, 
                           context.user_data.get('genre_id'), 
                           context.user_data.get('country_id'))
+        else:
+            # If no pending search, prompt for input
+            query.message.reply_text("🔍 لطفاً نام فیلم یا سریال مورد نظر خود را وارد کنید.")
 
 def advanced_search(update: Update, context: CallbackContext) -> None:
     """Handle advanced search command with arguments."""
@@ -199,57 +238,87 @@ def perform_search(update: Update, context: CallbackContext, query, content_type
     
     results = []
     
-    if not content_type or content_type in ['movie', 'both']:
-        # Search in movies
-        movie_results = video_search.search_movies(query, genre_id, country_id)
-        results.extend(movie_results)
-    
-    if not content_type or content_type in ['series', 'both']:
-        # Search in series
-        series_results = video_search.search_series(query, genre_id, country_id)
-        results.extend(series_results)
-    
-    if not results:
-        message.reply_text("متأسفانه نتیجه‌ای یافت نشد.")
-        return
-    
-    # Send results
-    for result in results:
-        title = result.get('title', 'بدون عنوان')
-        year = result.get('year', '')
-        genre = result.get('genre', '')
-        content_type = result.get('type', '')
-        poster = result.get('cover', '')
+    try:
+        # Add a timeout for API requests
+        if not content_type or content_type in ['movie', 'both']:
+            # Search in movies
+            logger.info(f"Searching for movies with query: {query}, genre: {genre_id}, country: {country_id}")
+            movie_results = video_search.search_movies(query, genre_id, country_id)
+            results.extend(movie_results)
         
-        caption = f"🎬 *{title}*\n"
-        caption += f"📅 سال: {year}\n"
-        caption += f"🎭 ژانر: {genre}\n"
-        caption += f"📺 نوع: {content_type}\n\n"
-        
-        sources = result.get('sources', [])
-        if sources:
-            caption += "🔗 منابع:\n"
-            for i, source in enumerate(sources[:5]):  # Limit to 5 sources to avoid message length issues
-                parsed_source = video_search.parse_source(source)
-                if parsed_source:
-                    source_type = parsed_source.get('type', 'نامشخص')
-                    quality = parsed_source.get('quality', 'نامشخص')
-                    url = parsed_source.get('url', '')
-                    
-                    caption += f"{i+1}. [{quality} - {source_type}]({url})\n"
+        if not content_type or content_type in ['series', 'both']:
+            # Search in series
+            logger.info(f"Searching for series with query: {query}, genre: {genre_id}, country: {country_id}")
+            series_results = video_search.search_series(query, genre_id, country_id)
+            results.extend(series_results)
             
-            if len(sources) > 5:
-                caption += f"و {len(sources) - 5} منبع دیگر...\n"
+        logger.info(f"Search completed. Found {len(results)} results.")
         
-        # Send poster if available, otherwise just send the message
-        if poster:
-            try:
-                message.reply_photo(photo=poster, caption=caption, parse_mode='Markdown')
-            except Exception as e:
-                logger.error(f"Error sending photo: {e}")
-                message.reply_text(caption, parse_mode='Markdown', disable_web_page_preview=False)
+        if not results:
+            message.reply_text("متأسفانه نتیجه‌ای یافت نشد.")
+            return
+        
+        # Limit results to avoid overwhelming Telegram
+        MAX_RESULTS = 5
+        if len(results) > MAX_RESULTS:
+            message.reply_text(f"تعداد {len(results)} نتیجه یافت شد. نمایش {MAX_RESULTS} نتیجه اول:")
+            results = results[:MAX_RESULTS]
         else:
-            message.reply_text(caption, parse_mode='Markdown', disable_web_page_preview=False)
+            message.reply_text(f"تعداد {len(results)} نتیجه یافت شد:")
+        
+        # Send results
+        for result in results:
+            title = result.get('title', 'بدون عنوان')
+            year = result.get('year', '')
+            genre = result.get('genre', '')
+            content_type = result.get('type', '')
+            poster = result.get('cover', '')
+            description = result.get('description', '')
+            
+            caption = f"🎬 *{title}*\n"
+            caption += f"📅 سال: {year}\n"
+            caption += f"🎭 ژانر: {genre}\n"
+            caption += f"📺 نوع: {content_type}\n\n"
+            
+            # Add description if available
+            if description:
+                # If description is too long, truncate it
+                if len(description) > 800:
+                    short_desc = description[:800] + "..."
+                    caption += f"📝 توضیحات: {short_desc}\n\n"
+                else:
+                    caption += f"📝 توضیحات: {description}\n\n"
+            
+            sources = result.get('sources', [])
+            if sources:
+                caption += "🔗 منابع:\n"
+                for i, source in enumerate(sources[:5]):  # Limit to 5 sources to avoid message length issues
+                    parsed_source = video_search.parse_source(source)
+                    if parsed_source:
+                        source_type = parsed_source.get('type', 'نامشخص')
+                        quality = parsed_source.get('quality', 'نامشخص')
+                        url = parsed_source.get('url', '')
+                        
+                        caption += f"{i+1}. [{quality} - {source_type}]({url})\n"
+                
+                if len(sources) > 5:
+                    caption += f"و {len(sources) - 5} منبع دیگر...\n"
+            
+            # Send poster if available, otherwise just send the message
+            if poster:
+                try:
+                    message.reply_photo(photo=poster, caption=caption, parse_mode='Markdown')
+                except Exception as e:
+                    logger.error(f"Error sending photo: {e}")
+                    message.reply_text(caption, parse_mode='Markdown', disable_web_page_preview=False)
+            else:
+                message.reply_text(caption, parse_mode='Markdown', disable_web_page_preview=False)
+                
+    except Exception as e:
+        logger.error(f"Error during search: {e}")
+        message.reply_text(f"خطا در جستجو: {str(e)[:100]}...\nلطفاً دوباره تلاش کنید.")
+        import traceback
+        logger.error(traceback.format_exc())
 
 def main() -> None:
     """Start the bot."""
