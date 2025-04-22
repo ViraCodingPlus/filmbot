@@ -90,71 +90,90 @@ def list_countries(update: Update, context: CallbackContext) -> None:
 
 def button_callback(update: Update, context: CallbackContext) -> None:
     """Handle button presses."""
-    query = update.callback_query
-    query.answer()
-    
-    callback_data = query.data
-    
-    if callback_data.startswith("genre_"):
-        genre_id = callback_data.split("_")[1]
-        context.user_data['genre_id'] = int(genre_id)
+    try:
+        query = update.callback_query
+        query.answer()
         
-        # Get genre name for better feedback
-        genres, _ = video_search.load_json_data()
-        genre_name = "انتخاب شده"
-        for genre in genres:
-            if str(genre.get('id')) == genre_id:
-                genre_name = genre.get('title')
-                break
+        callback_data = query.data
+        logger.info(f"Button callback received: {callback_data}")
         
-        # Edit the original message to confirm selection
-        query.edit_message_text(text=f"ژانر «{genre_name}» انتخاب شد.")
+        if callback_data.startswith("genre_"):
+            genre_id = callback_data.split("_")[1]
+            context.user_data['genre_id'] = int(genre_id)
+            
+            # Get genre name for better feedback
+            genres, _ = video_search.load_json_data()
+            genre_name = "انتخاب شده"
+            for genre in genres:
+                if str(genre.get('id')) == genre_id:
+                    genre_name = genre.get('title')
+                    break
+            
+            logger.info(f"Genre selected: {genre_name} (ID: {genre_id})")
+            
+            # Edit the original message to confirm selection
+            query.edit_message_text(text=f"ژانر «{genre_name}» انتخاب شد.")
+            
+            # Send a new message prompting for search term
+            query.message.reply_text("🔍 لطفاً اکنون نام فیلم یا سریال مورد نظر خود را وارد کنید.")
         
-        # Send a new message prompting for search term
-        query.message.reply_text("🔍 لطفاً اکنون نام فیلم یا سریال مورد نظر خود را وارد کنید.")
-    
-    elif callback_data.startswith("country_"):
-        country_id = callback_data.split("_")[1]
-        context.user_data['country_id'] = int(country_id)
+        elif callback_data.startswith("country_"):
+            country_id = callback_data.split("_")[1]
+            context.user_data['country_id'] = int(country_id)
+            
+            # Get country name for better feedback
+            _, countries = video_search.load_json_data()
+            country_name = "انتخاب شده"
+            for country in countries:
+                if str(country.get('id')) == country_id:
+                    country_name = country.get('title')
+                    break
+            
+            logger.info(f"Country selected: {country_name} (ID: {country_id})")
+                    
+            # Edit the original message to confirm selection
+            query.edit_message_text(text=f"کشور «{country_name}» انتخاب شد.")
+            
+            # Send a new message prompting for search term
+            query.message.reply_text("🔍 لطفاً اکنون نام فیلم یا سریال مورد نظر خود را وارد کنید.")
         
-        # Get country name for better feedback
-        _, countries = video_search.load_json_data()
-        country_name = "انتخاب شده"
-        for country in countries:
-            if str(country.get('id')) == country_id:
-                country_name = country.get('title')
-                break
-                
-        # Edit the original message to confirm selection
-        query.edit_message_text(text=f"کشور «{country_name}» انتخاب شد.")
-        
-        # Send a new message prompting for search term
-        query.message.reply_text("🔍 لطفاً اکنون نام فیلم یا سریال مورد نظر خود را وارد کنید.")
-    
-    elif callback_data.startswith("type_"):
-        content_type = callback_data.split("_")[1]
-        context.user_data['content_type'] = content_type
-        
-        # Map type to Persian for better feedback
-        type_names = {
-            "movie": "فیلم",
-            "series": "سریال",
-            "both": "فیلم و سریال"
-        }
-        type_name = type_names.get(content_type, "نامشخص")
-        
-        # Edit the original message
-        query.edit_message_text(text=f"جستجو در: «{type_name}»")
-        
-        # Check if there's a pending search
-        if 'pending_search' in context.user_data:
-            search_query = context.user_data.pop('pending_search')
-            perform_search(update, context, search_query, content_type, 
-                          context.user_data.get('genre_id'), 
-                          context.user_data.get('country_id'))
+        elif callback_data.startswith("type_"):
+            content_type = callback_data.split("_")[1]
+            context.user_data['content_type'] = content_type
+            
+            # Map type to Persian for better feedback
+            type_names = {
+                "movie": "فیلم",
+                "series": "سریال",
+                "both": "فیلم و سریال"
+            }
+            type_name = type_names.get(content_type, "نامشخص")
+            
+            logger.info(f"Content type selected: {type_name}")
+            
+            # Edit the original message
+            query.edit_message_text(text=f"جستجو در: «{type_name}»")
+            
+            # Check if there's a pending search
+            if 'pending_search' in context.user_data:
+                search_query = context.user_data.pop('pending_search')
+                logger.info(f"Processing pending search: {search_query}")
+                perform_search(update, context, search_query, content_type, 
+                              context.user_data.get('genre_id'), 
+                              context.user_data.get('country_id'))
+            else:
+                # If no pending search, prompt for input
+                query.message.reply_text("🔍 لطفاً نام فیلم یا سریال مورد نظر خود را وارد کنید.")
         else:
-            # If no pending search, prompt for input
-            query.message.reply_text("🔍 لطفاً نام فیلم یا سریال مورد نظر خود را وارد کنید.")
+            logger.warning(f"Unknown callback data received: {callback_data}")
+            query.message.reply_text("خطا: دستور ناشناخته. لطفاً دوباره تلاش کنید.")
+    
+    except Exception as e:
+        logger.error(f"Error in button callback: {str(e)}")
+        try:
+            update.effective_message.reply_text(f"خطا در پردازش دکمه. لطفاً دوباره تلاش کنید.")
+        except:
+            pass
 
 def advanced_search(update: Update, context: CallbackContext) -> None:
     """Handle advanced search command with arguments."""
@@ -198,38 +217,55 @@ def advanced_search(update: Update, context: CallbackContext) -> None:
 
 def search(update: Update, context: CallbackContext) -> None:
     """Search for movies and series based on message text."""
-    search_query = update.message.text
-    
-    # Get filters from user_data if available
-    genre_id = context.user_data.get('genre_id')
-    country_id = context.user_data.get('country_id')
-    content_type = context.user_data.get('content_type')
-    
-    # Clear user_data after using it
-    if 'genre_id' in context.user_data:
-        del context.user_data['genre_id']
-    if 'country_id' in context.user_data:
-        del context.user_data['country_id']
-    if 'content_type' in context.user_data:
-        del context.user_data['content_type']
-    
-    # Ask user to select content type if not specified
-    if not content_type:
-        keyboard = [
-            [
-                InlineKeyboardButton("فیلم", callback_data="type_movie"),
-                InlineKeyboardButton("سریال", callback_data="type_series"),
-                InlineKeyboardButton("هر دو", callback_data="type_both")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_text('لطفاً نوع محتوا را انتخاب کنید:', reply_markup=reply_markup)
+    try:
+        search_query = update.message.text
+        logger.info(f"Search request received: '{search_query}'")
         
-        # Save the search query for later use
-        context.user_data['pending_search'] = search_query
-        return
-    
-    perform_search(update, context, search_query, content_type, genre_id, country_id)
+        # Get filters from user_data if available
+        genre_id = context.user_data.get('genre_id')
+        country_id = context.user_data.get('country_id')
+        content_type = context.user_data.get('content_type')
+        
+        if genre_id:
+            logger.info(f"Using saved genre filter: {genre_id}")
+        if country_id:
+            logger.info(f"Using saved country filter: {country_id}")
+        if content_type:
+            logger.info(f"Using saved content type filter: {content_type}")
+        
+        # Clear user_data after using it
+        if 'genre_id' in context.user_data:
+            del context.user_data['genre_id']
+        if 'country_id' in context.user_data:
+            del context.user_data['country_id']
+        if 'content_type' in context.user_data:
+            del context.user_data['content_type']
+        
+        # Ask user to select content type if not specified
+        if not content_type:
+            keyboard = [
+                [
+                    InlineKeyboardButton("فیلم", callback_data="type_movie"),
+                    InlineKeyboardButton("سریال", callback_data="type_series"),
+                    InlineKeyboardButton("هر دو", callback_data="type_both")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            logger.info("Asking user to select content type")
+            update.message.reply_text('لطفاً نوع محتوا را انتخاب کنید:', reply_markup=reply_markup)
+            
+            # Save the search query for later use
+            context.user_data['pending_search'] = search_query
+            logger.info(f"Saved pending search: '{search_query}'")
+            return
+        
+        perform_search(update, context, search_query, content_type, genre_id, country_id)
+    except Exception as e:
+        logger.error(f"Error in search function: {str(e)}")
+        try:
+            update.message.reply_text("خطا در جستجو. لطفاً دوباره تلاش کنید.")
+        except:
+            pass
 
 def perform_search(update: Update, context: CallbackContext, query, content_type=None, genre_id=None, country_id=None) -> None:
     """Perform the actual search and send results."""
@@ -322,36 +358,61 @@ def perform_search(update: Update, context: CallbackContext, query, content_type
 
 def main() -> None:
     """Start the bot."""
-    # Get the token from environment variable
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    
-    if not token or token == "YOUR_TOKEN":
-        print("Please set your TELEGRAM_BOT_TOKEN in the .env file")
-        return
-    
-    # Create the Updater and pass it your bot's token
-    updater = Updater(token)
-    
-    # Get the dispatcher to register handlers
-    dispatcher = updater.dispatcher
-    
-    # Register command handlers
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help_command))
-    dispatcher.add_handler(CommandHandler("genres", list_genres))
-    dispatcher.add_handler(CommandHandler("countries", list_countries))
-    dispatcher.add_handler(CommandHandler("search", advanced_search))
-    
-    # Register callback query handler for button presses
-    dispatcher.add_handler(CallbackQueryHandler(button_callback))
-    
-    # Register message handler for search queries
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, search))
-    
-    # Start the Bot
-    print(f"Starting Telegram bot...")
-    updater.start_polling()
-    updater.idle()
+    try:
+        # Get the token from environment variable
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        
+        if not token or token == "YOUR_TOKEN":
+            print("Please set your TELEGRAM_BOT_TOKEN in the .env file")
+            return
+        
+        # Create the Updater and pass it your bot's token with clean polling settings
+        updater = Updater(
+            token,
+            use_context=True,
+            request_kwargs={'read_timeout': 10, 'connect_timeout': 10}
+        )
+        
+        # Get the dispatcher to register handlers
+        dispatcher = updater.dispatcher
+        
+        # Register command handlers
+        dispatcher.add_handler(CommandHandler("start", start))
+        dispatcher.add_handler(CommandHandler("help", help_command))
+        dispatcher.add_handler(CommandHandler("genres", list_genres))
+        dispatcher.add_handler(CommandHandler("countries", list_countries))
+        dispatcher.add_handler(CommandHandler("search", advanced_search))
+        
+        # Register callback query handler for button presses
+        dispatcher.add_handler(CallbackQueryHandler(button_callback))
+        
+        # Register message handler for search queries
+        dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, search))
+        
+        # Set up error handler
+        def error_handler(update, context):
+            """Log Errors caused by Updates."""
+            logger.warning('Update "%s" caused error "%s"', update, context.error)
+        
+        dispatcher.add_error_handler(error_handler)
+        
+        # Start the Bot with clean startup
+        print(f"Starting Telegram bot...")
+        logger.info("Starting bot with clean polling...")
+        updater.start_polling(
+            clean=True,  # Clean any pending updates on startup
+            timeout=30,
+            drop_pending_updates=True
+        )
+        
+        # Run the bot until you press Ctrl-C
+        updater.idle()
+        
+    except Exception as e:
+        logger.error(f"Error in main function: {str(e)}")
+        print(f"Error starting bot: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == '__main__':
     main() 
