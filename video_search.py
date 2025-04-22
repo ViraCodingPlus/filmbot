@@ -53,6 +53,89 @@ def process_response(response_data):
     print(f"Unexpected response format: {type(response_data)}")
     return []
 
+def extract_media_details(media_item, media_type, genre_title):
+    """Extract and format media details from API response"""
+    if not isinstance(media_item, dict):
+        return None
+        
+    # Extract basic info
+    title = safe_get(media_item, 'title', '')
+    year = safe_get(media_item, 'year', '')
+    poster = safe_get(media_item, 'poster', '')
+    sources = safe_get(media_item, 'sources', [])
+    
+    # Extract description or try to compile one from other fields
+    description = safe_get(media_item, 'description', '')
+    
+    # If no description is provided but we have other details, create one
+    if not description:
+        details = []
+        
+        # Try to extract common fields that might be in the response
+        original_name = safe_get(media_item, 'originalName', '')
+        if original_name:
+            details.append(f"نام اصلی: {original_name}")
+            
+        rating = safe_get(media_item, 'imdb', '') or safe_get(media_item, 'rating', '')
+        if rating:
+            details.append(f"امتیاز: {rating}/ 10")
+            
+        persian_name = safe_get(media_item, 'persianName', '') or safe_get(media_item, 'persian_title', '')
+        if persian_name:
+            details.append(f"نام پارسی: {persian_name}")
+            
+        genres = safe_get(media_item, 'genres', [])
+        if genres and isinstance(genres, list):
+            genres_str = ', '.join(genres)
+            details.append(f"ژانر: {genres_str}")
+        elif genre_title:
+            details.append(f"ژانر: {genre_title}")
+            
+        if year:
+            details.append(f"سال تولید: {year}")
+            
+        country = safe_get(media_item, 'country', '')
+        if country:
+            details.append(f"محصول: {country}")
+            
+        language = safe_get(media_item, 'language', '')
+        if language:
+            details.append(f"زبان: {language}")
+            
+        age_rating = safe_get(media_item, 'ageRating', '')
+        if age_rating:
+            details.append(f"رده سنی: {age_rating}")
+            
+        format_type = safe_get(media_item, 'format', '')
+        if format_type:
+            details.append(f"فرمت: {format_type}")
+            
+        quality = safe_get(media_item, 'quality', '')
+        if quality:
+            details.append(f"کیفیت: {quality}")
+            
+        size = safe_get(media_item, 'size', '')
+        if size:
+            details.append(f"حجم: {size}")
+            
+        plot = safe_get(media_item, 'plot', '') or safe_get(media_item, 'summary', '')
+        if plot:
+            details.append(f"\nخلاصه داستان:\n{plot}")
+            
+        # Join all details into a description
+        if details:
+            description = '\n'.join(details)
+    
+    return {
+        'title': title,
+        'year': year,
+        'genre': genre_title,
+        'type': media_type,
+        'sources': sources,
+        'poster': poster,
+        'description': description,
+    }
+
 def search_movies(query, genre_id=None, country_id=None):
     # Base URL for movie search
     base_url = "http://slamtiomid.info/api/movie/by/filtres/{genre_id}/year/{page_num}/4F5A9C3D9A86FA54EACEDDD635185/"
@@ -66,6 +149,7 @@ def search_movies(query, genre_id=None, country_id=None):
         
         for genre in search_genres:
             genre_id = genre.get('id')
+            genre_title = genre.get('title', '')
             if genre_id:
                 page = 0
                 while True:
@@ -87,16 +171,11 @@ def search_movies(query, genre_id=None, country_id=None):
                                     
                                 title = safe_get(movie, 'title', '')
                                 if query.lower() in title.lower() or query.lower() == title.lower():
-                                   
-                                    results.append({
-                                        'title': title,
-                                        'year': safe_get(movie, 'year', ''),
-                                        'genre': genre.get('title'),
-                                        'type': 'Movie',
-                                        'sources': safe_get(movie, 'sources', []),
-                                        'poster': safe_get(movie, 'poster', ''),
-                                    })
-                                    return results  # Return immediately when a match is found
+                                    movie_details = extract_media_details(movie, 'Movie', genre_title)
+                                    if movie_details:
+                                        results.append(movie_details)
+                                        if query.lower() == title.lower():  # Exact match
+                                            return results  # Return immediately for exact match
                             page += 1
                             time.sleep(0.5)  # Add a small delay to avoid overwhelming the server
                         except json.JSONDecodeError:
@@ -127,6 +206,7 @@ def search_series(query, genre_id=None, country_id=None):
         
         for genre in search_genres:
             genre_id = genre.get('id')
+            genre_title = genre.get('title', '')
             if genre_id:
                 page = 0
                 while True:
@@ -148,15 +228,11 @@ def search_series(query, genre_id=None, country_id=None):
                                     
                                 title = safe_get(serie, 'title', '')
                                 if query.lower() in title.lower() or query.lower() == title.lower():
-                                    results.append({
-                                        'title': title,
-                                        'year': safe_get(serie, 'year', ''),
-                                        'genre': genre.get('title'),
-                                        'type': 'Series',
-                                        'sources': safe_get(serie, 'sources', []),
-                                        'poster': safe_get(serie, 'poster', ''),
-                                    })
-                                    return results  # Return immediately when a match is found
+                                    serie_details = extract_media_details(serie, 'Series', genre_title)
+                                    if serie_details:
+                                        results.append(serie_details)
+                                        if query.lower() == title.lower():  # Exact match
+                                            return results  # Return immediately for exact match
                             page += 1
                             time.sleep(0.5)  # Add a small delay to avoid overwhelming the server
                         except json.JSONDecodeError:
