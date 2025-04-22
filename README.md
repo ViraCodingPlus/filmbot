@@ -17,10 +17,10 @@ pip install -r requirements.txt
 
 2. از طریق [BotFather](https://t.me/BotFather) یک ربات تلگرام ایجاد کنید و توکن آن را دریافت کنید.
 
-3. توکن دریافتی را در فایل `telegram_bot.py` در قسمت `YOUR_TOKEN` قرار دهید:
+3. توکن دریافتی را در فایل `.env` قرار دهید:
 
-```python
-updater = Updater("YOUR_TOKEN")
+```
+TELEGRAM_BOT_TOKEN=your_actual_token_here
 ```
 
 4. ربات را اجرا کنید:
@@ -28,6 +28,14 @@ updater = Updater("YOUR_TOKEN")
 ```bash
 python telegram_bot.py
 ```
+
+یا با استفاده از اسکریپت های ساده شده:
+
+```bash
+python run_bot.py
+```
+
+در ویندوز می‌توانید از فایل `run_bot.bat` استفاده کنید.
 
 ## دستورات ربات
 
@@ -50,4 +58,7 @@ python telegram_bot.py
 - `telegram_bot.py` - کد اصلی ربات تلگرام
 - `video_search.py` - ماژول جستجوی فیلم و سریال
 - `data/` - دایرکتوری حاوی فایل‌های داده (ژانرها و کشورها)
-- `requirements.txt` - لیست کتابخانه‌های مورد نیاز 
+- `requirements.txt` - لیست کتابخانه‌های مورد نیاز
+- `.env` - فایل حاوی توکن ربات و سایر متغیرهای محیطی
+- `run_bot.py` - اسکریپت ساده برای اجرای ربات
+- `run_bot.bat` - فایل batch برای اجرای آسان ربات در ویندوز 
